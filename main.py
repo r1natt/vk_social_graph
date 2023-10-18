@@ -126,62 +126,6 @@ class Parser:
 #                    time.sleep(0.2 - delta_t)
 
 
-class Saver: 
-    def save_friends(self, owner_id, friends_list, knee=0):
-        friends_dicts = friends_list["response"]["items"]
-        for friend_dict in friends_dicts:
-            friend_dict["whose_friend"] = owner_id  # буквально значит, чей друг, от кого я узнал этого человека
-            user_id = friend_dict["id"]
-            first_name = friend_dict["first_name"].replace("/", "-")
-            last_name = friend_dict["last_name"].replace("/", "-").replace("_", "-")
-            if knee == 0:
-                file_name = save_dir + f"{user_id}_{first_name}_{last_name}" + ".json"
-            else:
-                file_name = save_dir + f"{knee}_{user_id}_{first_name}_{last_name}" + ".json"
-
-            if not(self._is_vk_id_in_dir(user_id)):
-                with open(file_name, 'w') as f:
-                    json.dump(friend_dict, f, ensure_ascii=False)
-    
-    def _is_vk_id_in_dir(self, vk_id):
-        all_users_in_dir = os.listdir("./users/")
-        for i in all_users_in_dir:
-            if str(vk_id) in i:
-                return True
-        return False
-
-    def _get_user_file_name_by_vk_id(self, vk_id):
-        all_users_in_dir = os.listdir("./users/")
-        for i in all_users_in_dir:
-            if str(vk_id) in i:
-                return i
-
-    def add_friend_list_to_owner_id(self, owner_id, json_response):
-        file_name = self._get_user_file_name_by_vk_id(owner_id)
-        with open(save_dir + file_name, "r") as f:
-            file_info = json.load(f)
-        friends_list = json_response["response"]["items"]
-        friends_list_ids = [i["id"] for i in friends_list]
-        if 514707049 in friends_list_ids:
-            logger.info(f"В друзьях: {owner_id}")
-        file_info["friends"] = friends_list_ids
-        with open(save_dir + file_name, "w") as f:
-            json.dump(file_info, f, ensure_ascii=False)
-
-
-    def _get_users_n_knee(self, n):
-        # буквально получить друзей, сохраненных в users n-го колена
-        all_users_in_dir = os.listdir("./users/")
-        knees_users = {}
-        for user_file_name in all_users_in_dir:
-            knee, vk_id, name, last_name = user_file_name.replace(".json", "").split("_")
-            if knee not in knees_users:
-                knees_users[knee] = [vk_id]
-            else:
-                knees_users[knee].append(int(vk_id))
-        return knees_users[str(n)]
-
-
 parser = Parser()
 # parser.friends(my_vk_id)
 db = DB()
