@@ -1,89 +1,14 @@
-import requests
-from pprint import pprint
 import json
-import os
-import time
-import logging
 from config import token, mongo_uri, my_vk_id, save_dir, kate_vk_id
 from datetime import datetime
+
 from reqs import get_friends
-import copy
-import pymongo
-
-
-class DB:
-    def __init__(self):
-        myclient = pymongo.MongoClient(mongo_uri)
-        mydb = myclient["vk_parser"]
-        self.mycol = mydb["users"]
-
-    def save_users_friends(self, user_friends): 
-        friends_dicts = user_friends["response"]["items"]
-        for friend_dict in friends_dicts:
-            self.save_user(friend_dict)
-
-    def add_users_friends(self, vk_id, friends: list):
-        user_query = self.mycol.find_one({ "_id": vk_id })
-        if user_query == None:
-            user_data = {
-                "_id": vk_id,
-                "friends": friends
-            }
-        else:
-            user_data = user_query
-            print(user_data)
-            if "friends" in user_data:
-                for friend_id in friends:
-                    if friend_id not in user_data["friends"]:
-                        #user_data["friends"].add(friends)
-
-            else:
-                user_data["friends"] = friends
-        self.update_user_record(user_query, user_data)
-            
-    def update_user_record(self, record, updated_data):
-        print(record, updated_data)
-        self.mycol.update_one(record, updated_data)
-
-    def save_user(self, user_data):
-        self.mycol.insert_one(user_data)
-
-
-class UserData():
-    def __init__(self, owner_id, user_data):
-        self.user_data = user_data
-        self.owner_id = owner_id
-        self._cook_user_data()
-
-    def __repr__(self):
-        print(self.user_data)
-        return json.dumps(self.user_data, ensure_ascii=False)
-
-    def _cook_user_data(self):
-        self._user_handler()
-        self._user_add_date()
-    
-    def _user_add_date(self):
-        user_id = self.user_data["_id"]
-        del self.user_data["_id"]
-        today = datetime.today()
-        today = today.strftime("%Y-%m-%d_%H:%M:%S")
-        
-        updated_data = {}
-        updated_data["_id"] = user_id
-        updated_data[today] = self.user_data
-        self.user_data = updated_data
-
-    def _user_handler(self):
-        self.user_data["_id"] = self.user_data["id"]
-        del self.user_data["id"]
-        self.user_data["first_name"] = self.user_data["first_name"].replace("/", "-").replace("_", "-")
-        self.user_data["last_name"] = self.user_data["last_name"].replace("/", "-").replace("_", "-")
+from user_data import UserData
+from db import DB
 
 
 class Parser:
     def __init__(self):
-        self.saver = Saver()
         self.db = DB()
 
     def error_checker(self, vk_id):
