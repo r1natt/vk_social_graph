@@ -23,14 +23,17 @@ def get_friends(vk_id, advanced=True):
                 "access_token": token,
                 "v": 5.154,
                 "order": "hints",
-                "count": 1000,
-                "fields": fields            
+                "count": 1000
             }
-        ).text
-    json_response = json.loads(response)
+        )
+    json_response = json.loads(response.text)
     return json_response
 
-def get_user_info(user_ids: list):
+def get_users_info(user_ids: list):
+    """
+    Функция запрашивает данные сразу о нескольких пользователях c целью
+    уменьшить количество запросов
+    """
     fields = ",".join([
         "activities", "about", "blacklisted", "blacklisted_by_me", "books", 
         "bdate", "can_be_invited_group", "can_post", "can_see_all_posts", 
