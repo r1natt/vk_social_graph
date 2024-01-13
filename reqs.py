@@ -82,9 +82,11 @@ def get_friends(vk_id):
     json_response = json.loads(response.text)
     
     if Errors(json_response).is_error:
-        json_response = []
+        friends = []
+    else:
+        friends = json_response["response"]["items"]
 
-    return json_response
+    return friends
 
 @bucket_queue
 def get_users_info(user_ids: list):
