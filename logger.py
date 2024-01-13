@@ -1,23 +1,23 @@
 import logging
-from colorlog import ColoredFormatter
 
 
-STREAM_LOG_LEVEL = logging.DEBUG
-FILE_LOG_LEVEL = logging.INFO
-LOGFORMAT = "%(asctime)s %(name)s [%(levelname)s] - %(message)s (%(filename)s:%(lineno)s)"
-DATEFORMAT = "%d-%m-%Y %H:%M:%s"
-formatter = ColoredFormatter(LOGFORMAT)
+STREAM_LOG_LEVEL = logging.INFO
+FILE_LOG_LEVEL = logging.DEBUG
 
-stream = logging.StreamHandler()
-stream.setLevel(logging.INFO)
-stream.setFormatter(formatter)
+LOGFORMAT = "[%(levelname)s] %(asctime)s %(name)s - %(message)s (%(filename)s:%(lineno)s)"
+logger_formatter = logging.Formatter(LOGFORMAT)
 
-fh = logging.FileHandler("./logger.log")
-fh.setLevel(logging.DEBUG)
-fh.setFormatter(formatter)
+streamh = logging.StreamHandler()
+streamh.setLevel(STREAM_LOG_LEVEL)
+streamh.setFormatter(logger_formatter)
+
+fileh = logging.FileHandler("./logger.log")
+fileh.setLevel(FILE_LOG_LEVEL)
+fileh.setFormatter(logger_formatter)
 
 logger = logging.getLogger("logger")
 logger.setLevel(logging.DEBUG)
-logger.addHandler(fh)
-logger.addHandler(stream)  # Откоментирование этой строки добавляет вывод 
-                             # логов в терминал
+logger.addHandler(fileh)
+logger.addHandler(streamh)  
+
+logger.info("asd")
