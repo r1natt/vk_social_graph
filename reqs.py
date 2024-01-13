@@ -1,23 +1,11 @@
 import requests
 import json
 from config import token
+from logger import logger
+
 
 
 def get_friends(vk_id, advanced=True):
-    advanced_fields = ",".join([
-        "can_post", "can_see_all_posts", "can_write_private_message", "city",
-        "contacts", "country", "domain", "education", "has_mobile", "timezone",
-        "last_seen", "nickname", "online", "photo_100", "photo_200_orig",
-        "photo_50", "relation", "sex", "status", "universities"
-        ]
-    )
-    tiny_fields = ",".join(["nickname", "photo_200_orig", "sex", "status"])
-    
-    if advanced:
-        fields = advanced_fields
-    else:
-        fields = tiny_fields
-
     response = requests.get("https://api.vk.com/method/friends.get",
         params={"user_id": vk_id,
                 "access_token": token,
@@ -26,6 +14,9 @@ def get_friends(vk_id, advanced=True):
                 "count": 1000
             }
         )
+    
+    logger.debug(f"Friends request: {vk_id}")
+
     json_response = json.loads(response.text)
     return json_response
 
