@@ -1,10 +1,9 @@
-from config import my_vk_id, kate_vk_id
 from pprint import pprint
 import time
-
-from reqs import get_friends, get_user_info
+from actions import Users, Friends
+from reqs import tps_bucket
+from pprint import pprint
 from db import DB
-from errors import error_check, _get_vk_id_in_response
 
 
 hello_text = """
@@ -24,6 +23,13 @@ action_text = """
 
 Что выберите? (Введите номер действия): """
 
+depth_desc = """
+Для поиска друзей вглубь, нужно указать глубину (друзья вашего искомого 
+человека - 1-я глубина, друзья его друзей - 2-я глубина и т.д.).
+Важно понимать, что чем больше глубина, тем больше времени потребуется для 
+обработки и запросов на такое количество человек
+"""
+
 
 class Parser:
     def __init__(self, update=False):
@@ -33,7 +39,8 @@ class Parser:
         self.ask()
 
     def ask(self):
-        action = input()
+        #action = input()
+        action = "2"
         self.conds(action)
 
     def conds(self, action):
@@ -41,19 +48,16 @@ class Parser:
             case "1":
                 Users
             case "2":
-                print("friends")
+                vk_id = int(input("Введите id пользователя: "))
+                print(depth_desc)
+                depth = int(input("Введите нужную глубину: "))
+                
             case "3":
                 print("graph")
             case _:
                 print("Команды с таким номером нет, что выберите?: ", end="")
                 self.ask()
 
-    def get_friends_in_depth(self, vk_id, depth):
-        Users([vk_id])
-        friends_ids = [vk_id]
-        for _ in range(2, depth + 1):
-            friends_ids = Friends(friends_ids).search()
-            print(friends_ids)
 
 """
 Функционал:
@@ -67,7 +71,10 @@ class Parser:
  * Пройтись по всем сохраненным до этого друзьям и обновить инфу о них
 """
 
-#users = Users([321366596])
-Parser()
-#parser.get_friends_in_depth(my_vk_id, 4)
-#db.update({"_id": 1}, {"$set": {"a": 2}})
+if __name__ == "__main__":
+    tps_bucket.start()
+    try:
+        Friends(..., 1)
+        tps_bucket.stop()
+    except KeyboardInterrupt:
+        tps_bucket.stop()
