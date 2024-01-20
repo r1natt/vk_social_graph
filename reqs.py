@@ -1,7 +1,7 @@
 import requests
 import json
 from config import token
-from logger import reqs_logger
+from logger import general_log
 from multiprocessing import Process, Value
 import datetime
 from errors import Errors
@@ -28,8 +28,10 @@ class TPSBucket:
         self.bucket_refresh_process = Process(target=self.refill_bucket_per_second)
 
     def refill_bucket_per_second(self):
+        time.sleep(1 - (time.time() % 1))
         while True:
             self.refill_bucket()
+            # print(datetime.datetime.now().strftime('%H:%M:%S.%f'), "refill")
             time.sleep(1)
 
     def refill_bucket(self):
@@ -60,17 +62,15 @@ def bucket_queue(func):
     def exec_or_wait(*args, **kwargs):
         while True:
             if tps_bucket.get_token():
-                return func(*args, **kwargs)
+                query = func(*args, **kwargs)
+                return query
     return exec_or_wait
 
 
-tps_bucket = TPSBucket(expected_tps=5)
-
+tps_bucket = TPSBucket(expected_tps=4)
 
 @bucket_queue
 def get_friends(vk_id):
-    reqs_logger.debug(f"Friends request: {vk_id}")
-    
     response = requests.get("https://api.vk.com/method/friends.get",
         params={"user_id": vk_id,
                 "access_token": token,
@@ -79,6 +79,7 @@ def get_friends(vk_id):
                 "count": 1000
             }
         )
+    general_log.debug(f"Friends request: {vk_id}")
     json_response = json.loads(response.text)
     
     if Errors(json_response).is_error:
@@ -98,7 +99,7 @@ def get_users_info(user_ids: list):
         "activities", "about", "blacklisted", "blacklisted_by_me", "books", 
         "bdate", "can_be_invited_group", "can_post", "can_see_all_posts", 
         "can_see_audio", "can_send_friend_request", "can_write_private_message", 
-        "career", "common_count", "connections", "contacts", "city", 
+        "career", "connections", "contacts", "city", 
         "country", "crop_photo", "domain", "education", "exports", 
         "followers_count", "friend_status", "has_photo", "has_mobile", 
         "home_town", "photo_100", "photo_200", "photo_200_orig", 
@@ -109,6 +110,7 @@ def get_users_info(user_ids: list):
         "photo_max", "photo_max_orig", "quotes", "relation", "relatives", 
         "timezone", "tv", "universities"
     ])
+    # Я работаю с сервисным ключом, поле common_count не может быть запрошено
     str_user_ids = [str(user) for user in user_ids]
     users = ",".join(str_user_ids)
     response = requests.get("https://api.vk.com/method/users.get",
@@ -118,6 +120,17 @@ def get_users_info(user_ids: list):
                 "fields": fields            
             }
         )
+    general_log.debug(f"Users request: {len(user_ids)} items")
     json_response = json.loads(response.text)
-    return json_response
-
+    
+    if Errors(json_response).is_error:
+        users = []
+    else:
+        users = json_response["response"]
+    
+    return users
+"""
+tps_bucket.start()
+for i in range(1000):
+    print(datetime.datetime.now().strftime('%H:%M:%S.%f'), get_friends(66652366)[0])
+"""
