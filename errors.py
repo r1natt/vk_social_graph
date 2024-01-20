@@ -1,7 +1,13 @@
-from logger import reqs_logger 
+from logger import general_log, reqs_log
 
 
 class ExpiredToken(Exception):
+    pass
+
+class FrequencyLimit(Exception):
+    pass
+
+class InternalError(Exception):
     pass
 
 
@@ -29,12 +35,19 @@ class Errors:
     def check(self):
         if self._is_error_in_response():
             self.match_codes()
-        return 
 
     def match_codes(self):
         match self.code:
             case 5:
                 raise ExpiredToken("Update access token")
+            case 6:
+                general_log.debug(f"Too many requests per second.")
+                reqs_log.debug(self.response)
+                raise FrequencyLimit("Too many requests per second.")
+            case 10:
+                raise InternalError()
             case 30:
                 _id = self._get_vk_id_from_error_response()
-                reqs_logger.debug(f"profile {_id} is private")
+                general_log.debug(f"profile {_id} is private")
+            case _:
+                general_log.debug(f"Code: {self.code}")
