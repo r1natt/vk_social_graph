@@ -1,10 +1,6 @@
 from reqs import get_users_info, get_friends
-from db import DB
+import db
 from pprint import pprint
-
-
-db = DB()
-db.reset()
 
 
 class User(dict):
@@ -40,7 +36,7 @@ class Users:
             self.users.append(User(user_data))
 
     def save(self):
-        db.save_many_users(self.users)
+        db.Users().save_many_users(self.users)
 
 
 class Friends:
@@ -106,5 +102,5 @@ class Friends:
                 break
 
     def save(self, vk_id, friends_list):
-        db.save_friends(vk_id, friends_list)
+        db.Friends().save_friends(vk_id, friends_list)
 
