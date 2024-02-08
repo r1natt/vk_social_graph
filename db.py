@@ -65,8 +65,6 @@ class Users(DB):
         for user in users:
             self.save_user(user)
 
-    def find_for_graph(self, conds):
-        return self.users_col.find(conds)
 
 
 class Friends(DB):
@@ -131,7 +129,7 @@ class Friends(DB):
             # если список друзей до этого уже сохранялся, мы должны объединить
             # список в бд и новый список
             self._update_existing_record(vk_id, friends_list)
-        self._add_mutual_friends(vk_id, friends_list)
+        # self._add_mutual_friends(vk_id, friends_list)
 
     def _add_mutual_friends(self, whose_friends_vk_id, friends_list):
         
@@ -154,8 +152,41 @@ class Friends(DB):
                 data = {"_id": friend_vk_id, "friends": [whose_friends_vk_id]}
                 self.save(self.friends_col, data)
 
-    def find_for_graph(self, conds):
+
+class Graph(DB):
+    def __init__(self):
+        super().__init__()
+
+    def get_all_users(self):
+        return self.users_col.find({})
+
+    def get_all_friends(self):
+        return self.friends_col.find({})
+    
+    def get_user_friends(self, vk_id):
+        return self.friends_col.find_one({"_id": vk_id})
+
+    def get_part_of_friends(self):
+        friends = []
+        for user in self.get_all_friends():
+            if len(user["friends"]) >= 10:
+                friends.append(user)
+        return list(friends)
+
+    def get(self, conds):
         return self.friends_col.find(conds)
+
+
+    def get_name_by_vk_id(self, vk_id):
+        record = self.users_col.find_one({"_id": vk_id})
+        name = ""
+        if record != None:
+            first_name = record["first_name"]
+            last_name = record["last_name"]
+            name = first_name + " " + last_name
+        else:
+            name = str(vk_id)
+        return name
 
 
 """
