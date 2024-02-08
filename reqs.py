@@ -7,6 +7,7 @@ import datetime
 from errors import Errors
 import time
 
+
 """
 TPS - transaction per second
 VK API имеют лимиты на запросы (5 запросов в секунду, но позволяют они немного 
@@ -67,7 +68,7 @@ def bucket_queue(func):
     return exec_or_wait
 
 
-tps_bucket = TPSBucket(expected_tps=4)
+tps_bucket = TPSBucket(expected_tps=2)
 
 @bucket_queue
 def get_friends(vk_id):
@@ -82,7 +83,8 @@ def get_friends(vk_id):
     general_log.debug(f"Friends request: {vk_id}")
     json_response = json.loads(response.text)
     
-    if Errors(json_response).is_error:
+    error_check = Errors(json_response)
+    if error_check.is_error:
         friends = []
     else:
         friends = json_response["response"]["items"]
@@ -112,6 +114,7 @@ def get_users_info(user_ids: list):
     ])
     # Я работаю с сервисным ключом, поле common_count не может быть запрошено
     str_user_ids = [str(user) for user in user_ids]
+    str_user_ids = str_user_ids[:500] # ПОТОМ НАДО ПОФИКСИТЬ, ИЗЗА 414 ошибки я обрезаю КОЛИЧЕСТВО ЛЮДЕЙ В ЗАПРОСЕ!!!
     users = ",".join(str_user_ids)
     response = requests.get("https://api.vk.com/method/users.get",
         params={"user_ids": users,
