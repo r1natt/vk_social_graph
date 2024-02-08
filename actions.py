@@ -1,6 +1,5 @@
 from reqs import get_users_info, get_friends
 import db
-from pprint import pprint
 
 
 class User(dict):
@@ -44,41 +43,14 @@ class Friends:
         self.vk_id = vk_id
         self.update = update
         self.goal_depth = goal_depth + 1
-        
-        # entry_point_friends = self.request(vk_id)
-            # entry_point - друзья точки входа, то есть первая глубина в 
-            # парсинге друзей 
-        self.recurse_test(self.vk_id, 1)
+
+        self.recurse(self.vk_id, 1)
 
     def request(self, vk_id):
-        """
-        if not self.update:
-            friends = db.get_friends_except_in_db(vk_id)
-            if friends == None or len(friends) == 0:
-                friends = get_friends(vk_id)
-        else:
-            friends = get_friends(vk_id)
-        """
         friends = get_friends(vk_id)
         return friends
 
-    def recurse_test(self, source_id, depth):
-        if depth == self.goal_depth:
-            print((depth - 2) * "|-- " + "...")
-            return 1  # Выход из рекурсии происходит, когда мы достигаем 
-                      # искомой глубины
-
-        friends_list = self.request(source_id)
-        self.save(source_id, friends_list)
-        Users(friends_list)
-        for friend_vk_id in friends_list:
-            print((depth - 1) * "|-- " + str(friend_vk_id))
-            break
-            is_end = self.recurse_test(friend_vk_id, depth + 1)
-            if is_end == 1:
-                break
-
-    def recurse_consistently(self, source_id, friends_list, depth):
+    def recurse(self, source_id, depth):
         # Вся магия поиска вглубину происходит в этой функции, здесь я 
         # использую рекурсию для поиска вглубь, когда функция доходит до 
         # нужного мне уровня, она дальше не идет
@@ -86,18 +58,22 @@ class Friends:
         # Самая частая проблема для рекурсий - утечки памяти, но:
         # По идее одновременно количество запущенных функций не может 
         # превышать числа для поиска вглубину (если self.goal_depth = 3, то 
-        # единовременно не может существовать больше 3х функций recurse)
-
+        # единовременно не может существовать больше 3х функций recurse) 
         if depth == self.goal_depth:
             print((depth - 2) * "|-- " + "...")
             return 1  # Выход из рекурсии происходит, когда мы достигаем 
                       # искомой глубины
 
+        friends_list = self.request(source_id)
+
+        if len(friends_list) == 0 and depth == 1:
+            print("Профиль введеного пользователя закрыт")
+
         self.save(source_id, friends_list)
+        Users(friends_list)
         for friend_vk_id in friends_list:
             print((depth - 1) * "|-- " + str(friend_vk_id))
-            friends_req = self.request(friend_vk_id)
-            is_end = self.recurse_consistently(friend_vk_id, friends_req, depth + 1)
+            is_end = self.recurse_test(friend_vk_id, depth + 1)
             if is_end == 1:
                 break
 
