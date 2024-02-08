@@ -1,80 +1,43 @@
-from pprint import pprint
-import time
 from actions import Users, Friends
 from reqs import tps_bucket
-from pprint import pprint
-from db import DB
-
-
-hello_text = """
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-~ Это парсер Вконтакте, призванный упростить работу по сбору информации о    ~
-~ пользователях соцсети. Изначальная цель данного скрипта - составить граф   ~
-~ связей определенного человека.                                             ~
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-"""
-
-action_text = """
-Вот предлагаемый список действий:
-
-1) Запроть информацию о конкретном пользователе
-2) Составить список друзей пользователя
-3) Сформировать граф друзей
-
-Что выберите? (Введите номер действия): """
-
-depth_desc = """
-Для поиска друзей вглубь, нужно указать глубину (друзья вашего искомого 
-человека - 1-я глубина, друзья его друзей - 2-я глубина и т.д.).
-Важно понимать, что чем больше глубина, тем больше времени потребуется для 
-обработки и запросов на такое количество человек
-"""
+from gephi import Gephi
+from texts import texts
 
 
 class Parser:
     def __init__(self, update=False):
         self.update = update
-        print(hello_text)
-        print(action_text, end="")
+        print(texts["hello_text"])
+        print(texts["action_text"], end="")
         self.ask()
 
     def ask(self):
-        #action = input()
-        action = "2"
+        action = input()
         self.conds(action)
 
     def conds(self, action):
         match action:
             case "1":
-                Users
+                vk_id = int(input("Введите id пользователя: "))
+                Users([vk_id])
+                print("пользователь сохранен в бд")
             case "2":
                 vk_id = int(input("Введите id пользователя: "))
-                print(depth_desc)
+                print(texts["depth_desc"])
                 depth = int(input("Введите нужную глубину: "))
-                
+                Friends(vk_id, depth)
             case "3":
-                print("graph")
+                vk_id = int(input("Введите id пользователя для составления графа: "))
+                Gephi(vk_id)
             case _:
                 print("Команды с таким номером нет, что выберите?: ", end="")
                 self.ask()
 
 
-"""
-Функционал:
- * Получить всю инфу на странице одного пользователя
- * Получить друзей пользователя
- * Сформировать граф:
-    * Друзей
-    * Сообществ
-    * Реакций
- * Пройтись по бд
- * Пройтись по всем сохраненным до этого друзьям и обновить инфу о них
-"""
-
 if __name__ == "__main__":
     tps_bucket.start()
     try:
-        Friends(..., 1)
+        Parser()
         tps_bucket.stop()
     except KeyboardInterrupt:
         tps_bucket.stop()
