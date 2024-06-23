@@ -37,6 +37,9 @@ class DB:
         if self.find(col, vk_id) == None:
             return False
         return True
+    
+    def delete_layer_num(self):
+        self.friends_col.updateMany({}, { "$unset" : { "layer_num": 1 } })
 
 
 class Users(DB):
@@ -104,8 +107,8 @@ class Friends(DB):
             return self._exclude_in_db(record["friends"])
         return record["friends"]
     
-    def _new_record(self, whose_friends_vk_id, friends_list):
-        data = {"_id": whose_friends_vk_id, "friends": friends_list}
+    def _new_record(self, whose_friends_vk_id, friends_list, layer_num):
+        data = {"_id": whose_friends_vk_id, "friends": friends_list, "layer_num": layer_num}
         self.save(self.friends_col, data)
 
     def _update_existing_record(self, whose_friends_vk_id, friends_list):
@@ -116,7 +119,7 @@ class Friends(DB):
             updated_values = {"$addToSet": {"friends": {"$each": new_friends}}}
             self.update(self.friends_col, whose_friends_vk_id, updated_values)
 
-    def save_friends(self, vk_id, friends_list):
+    def save_friends(self, vk_id, friends_list, layer_num):
         # Функция сохраняет список друзей friends_list пользователя vk_id
         # vk_id - id пользователя вк, обладатель друзей
         # friends_list - список друзей пользователя
@@ -124,7 +127,7 @@ class Friends(DB):
         if not self._is_user_in_db(self.friends_col, vk_id):
             # условие выполняется, если до этого в бд не было сохранено списка
             # друзей этом пользователя
-            self._new_record(vk_id, friends_list)
+            self._new_record(vk_id, friends_list, layer_num)
         else:
             # если список друзей до этого уже сохранялся, мы должны объединить
             # список в бд и новый список

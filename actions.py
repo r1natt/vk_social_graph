@@ -1,5 +1,6 @@
 from reqs import get_users_info, get_friends
 import db
+from math import ceil
 
 
 class User(dict):
@@ -14,21 +15,24 @@ class User(dict):
 
 
 class Users:
-    def __init__(self, user_ids: list, save=True):
+    def __init__(self, user_ids: list):
         self.user_ids = user_ids
         self.users = []  # вся инфа по юзерам хранится здесь
 
         self.search()
-        if save:
-            self.save()
 
-    def request(self):
-        response = get_users_info(self.user_ids)
+    def request(self, parted_users_list):
+        response = get_users_info(parted_users_list)
         return response
 
     def search(self):
-        response = self.request()
-        self.init_users(response)
+        number_of_cycles = ceil(len(self.user_ids) / 500)
+        for i in range(number_of_cycles):
+            parted_users_list = self.user_ids[i * 500:i * 500 + 500]
+            response = self.request(parted_users_list)
+            self.init_users(response)
+            self.save()
+            self.users = []
 
     def init_users(self, response):
         for user_data in response:
@@ -40,55 +44,44 @@ class Users:
 
 class Friends:
     def __init__(self, vk_id: int, goal_depth: int, update=False):
+        db.delete_layer_num()
+
         self.vk_id = vk_id
         self.update = update
         self.goal_depth = goal_depth
 
+        self.layers_manager()
         # self.recurse(self.vk_id, 1)
+
+    def request(self, users_list, layer_num):
+        number_of_cycles = ceil(len(users_list) / 25)
+        print('number of cycles: ', number_of_cycles)
+        for i in range(number_of_cycles):
+            friends = get_friends(users_list[i * 25:i * 25 + 25])
+            self.save(friends, layer_num)
+            Users(friends)
 
     def get_layer_friends(self, layer_num):
         if layer_num == 1:
             users_list = [self.vk_id]
-            
-        
+            self.request(users_list, layer_num)
+        else:
+            pass
 
     def layers_manager(self):
         for i in range(self.goal_depth + 1):
             self.get_layer_friends(i)
 
-    '''
-    def request(self, vk_id):
-        friends = get_friends(vk_id)
-        return friends
-
-    def recurse(self, source_id, depth):
-        # Вся магия поиска вглубину происходит в этой функции, здесь я 
-        # использую рекурсию для поиска вглубь, когда функция доходит до 
-        # нужного мне уровня, она дальше не идет
-        # 
-        # Самая частая проблема для рекурсий - утечки памяти, но:
-        # По идее одновременно количество запущенных функций не может 
-        # превышать числа для поиска вглубину (если self.goal_depth = 3, то 
-        # единовременно не может существовать больше 3х функций recurse) 
-        if depth == self.goal_depth:
-            print((depth - 2) * "|-- " + "...")
-            return 1  # Выход из рекурсии происходит, когда мы достигаем 
-                      # искомой глубины
-
-        friends_list = self.request(source_id)
-
-        if len(friends_list) == 0 and depth == 1:
-            print("Профиль введеного пользователя закрыт")
-
-        self.save(source_id, friends_list)
-        Users(friends_list)
-        for friend_vk_id in friends_list:
-            print((depth - 1) * "|-- " + str(friend_vk_id))
-            is_end = self.recurse(friend_vk_id, depth + 1)
-            if is_end == 1:
-                break
-
-    def save(self, vk_id, friends_list):
-        db.Friends().save_friends(vk_id, friends_list)
-    '''
-
+    def save(self, owner_friends_pairs, layer_num):
+        """
+        owner_friends_pairs:
+        [
+            {'owner': 26...77, 'friends': [...]},
+            {'owner': 33...17, 'friends': [...]},
+            {'owner': 66...60, 'friends': [...]},
+        ]
+        """
+        for owner_friends_pair in owner_friends_pairs:
+            vk_id = owner_friends_pair['owner']
+            friends_list = owner_friends_pair['friends']
+            db.Friends().save_friends(vk_id, friends_list, layer_num)

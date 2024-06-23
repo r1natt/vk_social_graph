@@ -74,7 +74,7 @@ def bucket_queue(func):
 tps_bucket = TPSBucket(expected_tps=2)
 
 @bucket_queue
-def get_friends_execute_reqs(parted_users_list):
+def get_friends(parted_users_list):
     code = f"""
     var my_users = {parted_users_list};
     var return_data = [];
@@ -99,42 +99,6 @@ def get_friends_execute_reqs(parted_users_list):
     friends = json.loads(friends.text)
     return friends['response']
 
-def get_friends(users_list):
-    number_of_cycles = ceil(len(users_list) / 25)
-    print('number of cycles: ', number_of_cycles)
-    users_friends = []
-    for i in range(number_of_cycles):
-        print(i * 25, i * 25 + 25)
-        users_friends += get_friends_execute_reqs(users_list[i * 25:i * 25 + 25])
-    return users_friends
-
-tps_bucket.start()
-print(len(get_friends([2695377, 33994417, 65889850, 66927760, 85731004, 87186820, 101251072, 102013854, 112234597, 121923250, 132804584, 134117959, 138692332, 138966028, 144995034, 145957477, 148376178, 150387845, 150659210, 150925330, 157553198, 159953562, 160192302, 165875497, 166227328, 166354144, 166987837, 167216762, 169954793, 170122847, 175242329, 180978044, 181182492, 184060884, 184488794, 188377290, 190172214, 191223472, 192300383, 194911958, 195146772, 199316410, 202509857, 220494037, 222995820, 228707072, 230353463, 240326241, 242706801, 246794955, 247118376, 248685319, 252774684, 260515274, 262449975, 268104884, 270234980, 272402723, 282839399, 284456904, 292484853, 293568223, 299427279, 299830077, 307724182, 309322209, 311819448, 318658282, 320692179, 322535534, 323437765, 323534452, 324040975, 330675985, 331076160, 332675860, 333038736, 333798307, 336537789, 337110988, 341714325, 353021597, 353372671, 356005371, 358495501, 358687680, 359492386, 362758210, 383000248, 388354990, 388775460, 390384247, 390905535, 400445922, 410002600, 415190927, 419924233, 422407610, 422670045, 422975446, 425854961, 436344954, 437314559, 444863423, 447154882, 458406064, 458583563, 460921836, 461063711, 469685436, 470201403, 477278322, 480248223, 483836159, 485384484, 486095682, 495215494, 505186625, 511671587, 524986286, 530494073, 532588169, 565842103, 573841372, 577074699, 582330617, 585982405, 601963475, 603257266, 603465278, 613076820, 614658927, 632253124, 654223619, 695681230, 742068321, 748179209, 767741403, 778804628])))
-
-
-'''
-@bucket_queue
-def get_friends(vk_id):
-    response = requests.get("https://api.vk.com/method/friends.get",
-        params={"user_id": vk_id,
-                "access_token": token,
-                "v": 5.154,
-                "order": "hints",
-                "count": 1000
-            }
-        )
-    general_log.debug(f"Friends request: {vk_id}")
-    json_response = json.loads(response.text)
-    
-    error_check = Errors(json_response)
-    if error_check.is_error:
-        friends = []
-    else:
-        friends = json_response["response"]["items"]
-
-    return friends
-'''
-
 @bucket_queue
 def get_users_info(user_ids: list):
     """
@@ -158,7 +122,6 @@ def get_users_info(user_ids: list):
     ])
     # Я работаю с сервисным ключом, поле common_count не может быть запрошено
     str_user_ids = [str(user) for user in user_ids]
-    str_user_ids = str_user_ids[:500] # ПОТОМ НАДО ПОФИКСИТЬ, ИЗЗА 414 ошибки я обрезаю КОЛИЧЕСТВО ЛЮДЕЙ В ЗАПРОСЕ!!!
     users = ",".join(str_user_ids)
     response = requests.get("https://api.vk.com/method/users.get",
         params={"user_ids": users,
