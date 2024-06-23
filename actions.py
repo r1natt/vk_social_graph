@@ -42,10 +42,21 @@ class Friends:
     def __init__(self, vk_id: int, goal_depth: int, update=False):
         self.vk_id = vk_id
         self.update = update
-        self.goal_depth = goal_depth + 1
+        self.goal_depth = goal_depth
 
-        self.recurse(self.vk_id, 1)
+        # self.recurse(self.vk_id, 1)
 
+    def get_layer_friends(self, layer_num):
+        if layer_num == 1:
+            users_list = [self.vk_id]
+            
+        
+
+    def layers_manager(self):
+        for i in range(self.goal_depth + 1):
+            self.get_layer_friends(i)
+
+    '''
     def request(self, vk_id):
         friends = get_friends(vk_id)
         return friends
@@ -79,4 +90,5 @@ class Friends:
 
     def save(self, vk_id, friends_list):
         db.Friends().save_friends(vk_id, friends_list)
+    '''
 
