@@ -8,7 +8,7 @@ class Gephi:
         self.g = nx.Graph()
         self.db = Graph()
         self.source = source
-        self.depth = 5
+        self.degree = 5
         self.social_graph()
 
     def save_graph(self):
@@ -21,7 +21,7 @@ class Gephi:
 
     def social_graph(self):
         self.friends = self.db.get_user_friends(self.source)["friends"]
-        self.fisrt_depth_friends()
+        self.fisrt_degree_friends()
         self.second_layer()
         self.filter()
         self.save_graph()
@@ -31,17 +31,17 @@ class Gephi:
         name = input()
         return name
 
-    def fisrt_depth_friends(self):
-        name = self.db  .get_name_by_vk_id(self.source)
+    def fisrt_degree_friends(self):
+        name = self.db.get_name_by_vk_id(self.source)
         self.g.add_node(self.source, label=name, color="source")
         for friend in self.friends:
-            name = self.db  .get_name_by_vk_id(friend)
+            name = self.db.get_name_by_vk_id(friend)
             self.g.add_node(friend, color="red")
             self.g.add_edge(self.source, friend)
 
     def second_layer(self):
         for friend in self.friends:
-            second_layer = self.db  .get_user_friends(friend)
+            second_layer = self.db.get_user_friends(friend)
             if second_layer == None:
                 second_layer = []
             else:
@@ -52,9 +52,9 @@ class Gephi:
                 self.g.add_edge(friend, i)
 
     def filter(self):
-        fedges = filter(lambda x: self.g.depth()[x[0]] < self.depth or 
-                        self.g.depth()[x[1]] < self.depth, self.g.edges())
+        fedges = filter(lambda x: self.g.degree()[x[0]] < self.degree or 
+                        self.g.degree()[x[1]] < self.degree, self.g.edges())
         self.g.remove_edges_from(fedges)
-        fnodes = list(filter(lambda x: self.g.depth()[x] < self.depth, self.g.nodes()))
+        fnodes = list(filter(lambda x: self.g.degree()[x] < self.degree, self.g.nodes()))
         self.g.remove_nodes_from(fnodes)
 
