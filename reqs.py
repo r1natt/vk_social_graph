@@ -22,6 +22,8 @@ TPSBucket - решает эту проблему, по сути своей эт�
 Важно отметить, что этот класс будет работать и с запросами, поступающеми от 
 разных процессов одновременно
 """
+
+
 class TPSBucket:
     def __init__(self, expected_tps):
         self.number_of_tokens = Value('i', 0)
@@ -132,8 +134,3 @@ def get_users_info(user_ids: list):
         users = json_response["response"]
     
     return users
-"""
-tps_bucket.start()
-for i in range(1000):
-    print(datetime.datetime.now().strftime('%H:%M:%S.%f'), get_friends(66652366)[0])
-"""

@@ -13,9 +13,9 @@ class Parser:
 
     def ask(self):
         action = input()
-        self.conds(action)
+        self.conditions(action)
 
-    def conds(self, action):
+    def conditions(self, action):
         match action:
             case "1":
                 vk_id = int(input("Введите id пользователя: "))

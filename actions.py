@@ -2,6 +2,11 @@ from reqs import get_users_info, get_friends
 import db
 
 
+class Save():
+    def __init__(self):
+        
+
+
 class User(dict):
     def __init__(self, user_data):
         self.update(user_data)
@@ -73,7 +78,7 @@ class Friends:
         Users(friends_list)
         for friend_vk_id in friends_list:
             print((depth - 1) * "|-- " + str(friend_vk_id))
-            is_end = self.recurse_test(friend_vk_id, depth + 1)
+            is_end = self.recurse(friend_vk_id, depth + 1)
             if is_end == 1:
                 break
 
