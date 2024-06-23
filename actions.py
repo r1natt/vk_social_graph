@@ -2,11 +2,6 @@ from reqs import get_users_info, get_friends
 import db
 
 
-class Save():
-    def __init__(self):
-        
-
-
 class User(dict):
     def __init__(self, user_data):
         self.update(user_data)
