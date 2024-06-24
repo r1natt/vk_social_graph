@@ -1,9 +1,8 @@
-certifi==2023.7.22
-charset-normalizer==3.3.0
-colorlog==6.7.0
-dnspython==2.4.2
-idna==3.4
-networkx==3.2
-pymongo==4.5.0
-requests==2.31.0
-urllib3==2.0.6
+certifi==2024.6.2
+charset-normalizer==3.3.2
+dnspython==2.6.1
+idna==3.7
+networkx==3.3
+pymongo==4.7.3
+requests==2.32.3
+urllib3==2.2.2
