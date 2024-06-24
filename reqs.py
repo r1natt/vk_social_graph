@@ -94,6 +94,54 @@ def get_friends(vk_id):
     return friends
 
 @bucket_queue
+def get_many_friends(parted_users_list):
+    code = f"""
+    var my_users = {parted_users_list};
+    var return_data = [];
+    var a = 0;
+    while (a != my_users.length) {{
+        var friends = API.friends.get({{ "user_id":my_users[a] }});
+        var owner_friends_dict = {{"owner": my_users[a], "friends": friends.items}};
+        return_data.push(owner_friends_dict);
+
+        a = a + 1;
+    }}; 
+    return return_data;
+    """
+
+    friends = requests.get("https://api.vk.com/method/execute",
+        params = {
+            "code": code,
+            "access_token": token,
+            "v": 5.199
+        }
+    )
+    friends = json.loads(friends.text)
+    return friends['response']
+
+@bucket_queue
+def get_users_info(user_ids: list):
+    code = f"""
+    var user_ids = {user_ids};
+
+    var users = API.users.get({{ "user_ids":user_ids }});
+    
+    return users;
+    """
+
+    users = requests.get("https://api.vk.com/method/execute",
+        params = {
+            "code": code,
+            "access_token": token,
+            "v": 5.199
+        }
+    )
+    users = json.loads(users.text)
+    
+    return users['response']
+
+'''
+@bucket_queue
 def get_users_info(user_ids: list):
     """
     Функция запрашивает данные сразу о нескольких пользователях c целью
@@ -134,3 +182,4 @@ def get_users_info(user_ids: list):
         users = json_response["response"]
     
     return users
+'''

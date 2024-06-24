@@ -1,6 +1,7 @@
 import pymongo
 from config import mongo_uri
 from user_data import User
+import time
 
 
 def get_conn():
@@ -66,7 +67,6 @@ class Users(DB):
             self.save_user(user)
 
 
-
 class Friends(DB):
     def __init__(self):
         super().__init__()
@@ -109,12 +109,14 @@ class Friends(DB):
         self.save(self.friends_col, data)
 
     def _update_existing_record(self, whose_friends_vk_id, friends_list):
-        friends_in_db = set(self._get_friends_by_id(whose_friends_vk_id))
-        friends_list = set(friends_list)
-        new_friends = sorted(list(friends_list - friends_in_db))
-        if len(new_friends) != 0:
-            updated_values = {"$addToSet": {"friends": {"$each": new_friends}}}
-            self.update(self.friends_col, whose_friends_vk_id, updated_values)
+        db_friends = self._get_friends_by_id(whose_friends_vk_id)
+        if db_friends != None:
+            friends_in_db = set(self._get_friends_by_id(whose_friends_vk_id))
+            friends_list = set(friends_list)
+            new_friends = sorted(list(friends_list - friends_in_db))
+            if len(new_friends) != 0:
+                updated_values = {"$addToSet": {"friends": {"$each": new_friends}}}
+                self.update(self.friends_col, whose_friends_vk_id, updated_values)
 
     def save_friends(self, vk_id, friends_list):
         # Функция сохраняет список друзей friends_list пользователя vk_id
@@ -132,7 +134,6 @@ class Friends(DB):
         # self._add_mutual_friends(vk_id, friends_list)
 
     def _add_mutual_friends(self, whose_friends_vk_id, friends_list):
-        
         for friend_vk_id in friends_list:
             # проходимся по всем друзьям циклом
             if self._is_record_exist(friend_vk_id):
@@ -187,12 +188,3 @@ class Graph(DB):
         else:
             name = str(vk_id)
         return name
-
-
-"""
-db = DB()
-
-db.save_friends(1, [2, 3, 4])
-db.save_friends(2, [4, 5, 6])
-print(db.get_friends_except_in_db(2))
-"""
