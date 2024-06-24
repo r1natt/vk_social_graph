@@ -7,7 +7,7 @@ import time
 def get_conn():
 
     myclient = pymongo.MongoClient(mongo_uri)
-    mydb = myclient["vk_parser"]
+    mydb = myclient["vk_parser1"]
 
     users_col = mydb["users"]
     friends_col = mydb["friends"]
@@ -131,7 +131,7 @@ class Friends(DB):
             # если список друзей до этого уже сохранялся, мы должны объединить
             # список в бд и новый список
             self._update_existing_record(vk_id, friends_list)
-        # self._add_mutual_friends(vk_id, friends_list)
+        self._add_mutual_friends(vk_id, friends_list)
 
     def _add_mutual_friends(self, whose_friends_vk_id, friends_list):
         for friend_vk_id in friends_list:
@@ -177,7 +177,6 @@ class Graph(DB):
     def get(self, conds):
         return self.friends_col.find(conds)
 
-
     def get_name_by_vk_id(self, vk_id):
         record = self.users_col.find_one({"_id": vk_id})
         name = ""
@@ -188,3 +187,26 @@ class Graph(DB):
         else:
             name = str(vk_id)
         return name
+    
+    def get_count_of_mutual_relations(self, friends_list, vk_id):
+        """
+        Я сохраняю в бд записи с общими связями:
+        Если я затрагиваю пользователя A:
+        {A: [B, C, D]}
+        Но парсер не дотянулся до B, C, D из-за глубины сохранения,
+        то я в любом случае сохраняю обратные связи
+        {B: A}
+        {C: A}
+        {D: A}
+
+        Данная функция берет список друзей vk_id и находит пересечение 
+        его списка друзей и friends_list и возвращает количество людей 
+        в пересечении
+
+        Используется для составления графа 2-го и выше колена, когда 
+        друзья source пользователя уже нанесены на граф
+        """
+        user_friends = set(self.get_user_friends(vk_id)["friends"])
+        friends_list = set(friends_list)
+        return len(user_friends & friends_list)
+

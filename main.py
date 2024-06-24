@@ -28,7 +28,8 @@ class Parser:
                 Friends(vk_id, depth)
             case "3":
                 vk_id = int(input("Введите id пользователя для составления графа: "))
-                Gephi(vk_id)
+                #degree = int(input("Введите минимальное количество общих друзей, которые должны быть у пользователей 2-го колена: "))
+                Gephi(vk_id, degree=3, knees=3)
             case _:
                 print("Команды с таким номером нет, что выберите?: ", end="")
                 self.ask()
