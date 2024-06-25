@@ -22,8 +22,6 @@ TPSBucket - решает эту проблему, по сути своей эт�
 Важно отметить, что этот класс будет работать и с запросами, поступающеми от 
 разных процессов одновременно
 """
-
-
 class TPSBucket:
     def __init__(self, expected_tps):
         self.number_of_tokens = Value('i', 0)
@@ -139,47 +137,3 @@ def get_users_info(user_ids: list):
     users = json.loads(users.text)
     
     return users['response']
-
-'''
-@bucket_queue
-def get_users_info(user_ids: list):
-    """
-    Функция запрашивает данные сразу о нескольких пользователях c целью
-    уменьшить количество запросов
-    """
-    fields = ",".join([
-        "activities", "about", "blacklisted", "blacklisted_by_me", "books", 
-        "bdate", "can_be_invited_group", "can_post", "can_see_all_posts", 
-        "can_see_audio", "can_send_friend_request", "can_write_private_message", 
-        "career", "connections", "contacts", "city", 
-        "country", "crop_photo", "domain", "education", "exports", 
-        "followers_count", "friend_status", "has_photo", "has_mobile", 
-        "home_town", "photo_100", "photo_200", "photo_200_orig", 
-        "photo_400_orig", "photo_50", "sex", "site", "schools", "screen_name", 
-        "status", "verified", "games", "interests", "is_favorite", "is_friend",
-        "is_hidden_from_feed", "last_seen", "maiden_name", "military", "movies", 
-        "music", "nickname", "occupation", "online", "personal", "photo_id", 
-        "photo_max", "photo_max_orig", "quotes", "relation", "relatives", 
-        "timezone", "tv", "universities"
-    ])
-    # Я работаю с сервисным ключом, поле common_count не может быть запрошено
-    str_user_ids = [str(user) for user in user_ids]
-    str_user_ids = str_user_ids[:500] # ПОТОМ НАДО ПОФИКСИТЬ, ИЗЗА 414 ошибки я обрезаю КОЛИЧЕСТВО ЛЮДЕЙ В ЗАПРОСЕ!!!
-    users = ",".join(str_user_ids)
-    response = requests.get("https://api.vk.com/method/users.get",
-        params={"user_ids": users,
-                "access_token": token,
-                "v": 5.154,
-                "fields": fields            
-            }
-        )
-    general_log.debug(f"Users request: {len(user_ids)} items")
-    json_response = json.loads(response.text)
-    
-    if Errors(json_response).is_error:
-        users = []
-    else:
-        users = json_response["response"]
-    
-    return users
-'''
