@@ -1,5 +1,5 @@
 import pymongo
-from config import mongo_uri
+from config import mongo_uri, db_name
 from user_data import User
 import time
 
@@ -7,7 +7,7 @@ import time
 def get_conn():
 
     myclient = pymongo.MongoClient(mongo_uri)
-    mydb = myclient["vk_parser1"]
+    mydb = myclient[db_name]
 
     users_col = mydb["users"]
     friends_col = mydb["friends"]
