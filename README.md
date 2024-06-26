@@ -21,3 +21,7 @@
    source ./env/bin/activate
    pip3 install -r requirements.txt
    ```
+4. Получите [vk api токен](https://dev.vk.com/ru/api/access-token/getting-started) и введите его в config.env Таким образом:
+   ```
+   API_TOKEN="4d...7a"
+   ```
