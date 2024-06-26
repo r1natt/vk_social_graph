@@ -38,3 +38,13 @@
 python3 main.py
 ```
 и следуйте инструкциям
+
+<p align="center">
+<img src="examples/friends.png" width="700">
+<img src="examples/graph.png" width="700">
+</p>
+
+## Визуализация графа
+Для создания графа используется open-source решение [Gephi](https://gephi.org/)
+
+[![IMAGE ALT TEXT HERE](https://img.youtube.com/vi/qwlnnTsFCiA/0.jpg)](https://www.youtube.com/watch?v=qwlnnTsFCiA)
