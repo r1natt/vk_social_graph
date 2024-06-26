@@ -19,17 +19,14 @@ class Parser:
         match action:
             case "1":
                 vk_id = int(input("Введите id пользователя: "))
-                Users([vk_id])
-                print("пользователь сохранен в бд")
-            case "2":
-                vk_id = int(input("Введите id пользователя: "))
                 print(texts["depth_desc"])
                 depth = int(input("Введите нужную глубину: "))
                 Friends(vk_id, depth)
-            case "3":
+            case "2":
                 vk_id = int(input("Введите id пользователя для составления графа: "))
-                #degree = int(input("Введите минимальное количество общих друзей, которые должны быть у пользователей 2-го колена: "))
-                Gephi(vk_id, degree=3, knees=3)
+                knees = int(input("Введите глубину: "))
+                degree = int(input("Введите минимальное количество общих друзей, которые должны быть у пользователей 2-го колена: "))
+                Gephi(vk_id, degree=degree, knees=knees)
             case _:
                 print("Команды с таким номером нет, что выберите?: ", end="")
                 self.ask()
@@ -42,3 +39,4 @@ if __name__ == "__main__":
         tps_bucket.stop()
     except KeyboardInterrupt:
         tps_bucket.stop()
+
