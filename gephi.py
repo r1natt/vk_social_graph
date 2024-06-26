@@ -98,8 +98,10 @@ class Gephi:
         path = "./graphs"
         if not os.path.isdir(path):
             os.mkdir(path)
-        filename = "./graphs/" + self.get_filename() + ".gexf"
-        nx.write_gexf(self.g, filename)
+        filename = self.get_filename()
+        file_path = "./graphs/" + filename + ".gexf"
+        nx.write_gexf(self.g, file_path)
+        print(f"Файл сохранен в ./graphs/{filename}.gexf")
     
     def get_filename(self):
         print("Введите имя файла графа: ", end="")
