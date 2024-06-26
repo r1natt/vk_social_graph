@@ -5,7 +5,7 @@
 ## 🌟 Preview
 
 <p align="center">
-  <img src="images/example_3.png" width="500">
+  <img src="examples/example_3.png" width="500">
 </p>
 <p align="center">Пример графа 3-го колена</p>
 
