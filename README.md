@@ -1,4 +1,4 @@
-<h1 align="center">VK parser</h1>
+<h1 align="center">VK social graph</h1>
 
 <p>Скрипт способный собрать граф связей пользователя вк, используя апи<p>
 
@@ -21,7 +21,15 @@
    source ./env/bin/activate
    pip3 install -r requirements.txt
    ```
-4. Получите [vk api токен](https://dev.vk.com/ru/api/access-token/getting-started) и введите его в config.env Таким образом:
+
+## Получение Апи Токена
+Для того, чтобы получить сервисный ключ доступа вам необходимо:
+1) Создать свое мини приложение [здесь](https://dev.vk.com/ru/admin/apps-list)
+2) Перейти в пункт "Разработка" -> "Ключи доступа"
+3) Скопировать "Сервисный ключ доступа" в `config.env` таким образом:
    ```
    API_TOKEN="4d...7a"
    ```
+
+
+   
