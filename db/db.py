@@ -5,7 +5,6 @@ import time
 
 
 def get_conn():
-
     myclient = pymongo.MongoClient(mongo_uri)
     mydb = myclient[db_name]
 
@@ -15,8 +14,7 @@ def get_conn():
 
 
 class DB:
-    def __init__(self):
-        self.users_col, self.friends_col = get_conn()
+    users_col, friends_col = get_conn()
 
     def reset(self):
         self.friends_col.delete_many({})

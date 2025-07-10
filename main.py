@@ -1,6 +1,6 @@
-from actions import Users, Friends
-from reqs import tps_bucket
-from gephi import Gephi
+from service.actions import Users, Friends
+from utils.reqs import tps_bucket
+from service.gephi import Gephi
 from texts import texts
 
 

@@ -1,5 +1,5 @@
 import networkx as nx
-from db import Graph
+from db.db import Graph
 import os
 
 
