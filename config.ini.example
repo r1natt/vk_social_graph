@@ -1,0 +1,10 @@
+[VK_API]
+SERVICE_KEY = vk_app_service_key
+
+[MONGO]
+URI = mongo_db_uri
+DB_NAME = db_name
+
+[TEST]
+TEST_USER = your_vk_user_id
+SECOND_TEST_USER = your_friend_vk_user_id
