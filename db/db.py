@@ -1,210 +1,226 @@
-import pymongo
-from config import mongo_uri, db_name
-from user_data import User
-import time
+import logging
+from abc import ABC, abstractclassmethod
+from enum import Enum
+from datetime import datetime, timedelta
+from pymongo import MongoClient
+from bson.objectid import ObjectId
+from config.config import MONGO_URI, MONGO_DB_NAME, MONGO_TEST_DB_NAME
+from models._types import (
+    VK_ID,
+    BaseResponse,
+    FriendsResponse,
+    UserResponse,
+    BaseRecord,
+    FriendsRecord,
+    UserRecord
+)
 
 
-def get_conn():
-    myclient = pymongo.MongoClient(mongo_uri)
-    mydb = myclient[db_name]
-
-    users_col = mydb["users"]
-    friends_col = mydb["friends"]
-    return users_col, friends_col
+logger = logging.getLogger(__name__)
 
 
-class DB:
-    users_col, friends_col = get_conn()
+class CollectionName(Enum):
+    FRIENDS = "friends"
+    USERS = "users"
 
-    def reset(self):
-        self.friends_col.delete_many({})
-        self.users_col.delete_many({})
+class BaseClient:
+    def __init__(self, client):
+        self.db = client[MONGO_DB_NAME]
 
-    def find(self, col, vk_id):
-        query = col.find_one({"_id": vk_id})
-        if query == None:
-            return None
-        return query
+    def collection(self, collection_name: str):
+        return self.db[collection_name]
 
-    def update(self, col, vk_id, updated_data):
-        col.update_one({"_id": vk_id}, updated_data)
+class MongoMethods:
+    def __init__(self, collection):
+        self.collection = collection
 
-    def save(self, col, data):
-        col.insert_one(data)
+    def _insert(self, data: BaseRecord) -> list[ObjectId]:
+        if isinstance(data, BaseRecord):
+            data = [data]
+        format_for_insert = [record.model_dump(by_alias=True) for record in data]
+        return self.collection.insert_many(format_for_insert).inserted_ids
 
-    def _is_user_in_db(self, col, vk_id) -> bool:
-        if self.find(col, vk_id) == None:
-            return False
-        return True
+    def _find(self, query, many=False) -> list:
+        if many:
+            return [record for record in self.collection.find(query)]
+        return self.collection.find_one(query)
+
+    def _update(self, query, new_value) -> None:
+        new_value_request = {"$set": new_value}
+        self.collection.update_one(query, new_value_request)
+
+    def _delete(self, query):
+        pass
 
 
-class Users(DB):
-    def __init__(self):
-        super().__init__()
+class Collection(ABC):
+    @abstractclassmethod
+    def save(self, vk_id: VK_ID, data: BaseResponse):
+        pass
 
-    def _records_diff(self, record):
-        data_in_db = self.find({"_id": vk_id})
+    @abstractclassmethod
+    def get_by_vk_id(self, vk_id: VK_ID) -> BaseRecord:
+        pass
 
-        set_dict = {"$set": data_for_update}
-        self.update(vk_id, set_dict)
+    @abstractclassmethod
+    def is_in_db(self, vk_id: VK_ID) -> bool:
+        pass
 
-    def save_user(self, user: User):
-        vk_id = user["_id"]
-        if not self._is_user_in_db(self.users_col, vk_id):
-            self.save(self.users_col, user)
+
+class FriendsCollection(MongoMethods, Collection):
+    def __init__(self, collection, update_policy, period):
+        super().__init__(collection)
+
+        self.update_policy = update_policy
+        self.period: timedelta = period
+
+    def save(self, vk_id: VK_ID, data: FriendsResponse):
+        is_in_db = self.is_in_db(vk_id)
+        if self.update_policy and is_in_db:
+            self._update_record(vk_id, data)
+        elif not(is_in_db):
+            self._new_record(vk_id, data)
         else:
-            # Делает одно и то же, пока временно
-            """
-            По идее словарь user новее, чем данные в бд, поэтому я сравниваю 
-            два этих словаря поэлементно, и добавляю только те данные, которые
-            изменились
-            """
+            pass
 
-    def save_many_users(self, users: list[User]):
-        for user in users:
-            self.save_user(user)
+    def _update_record(self, vk_id, new_data: FriendsResponse):
+        record_in_db = self.get_by_vk_id(vk_id)
+        last_active_friends_list = record_in_db.active_friends
+        deleted_friends_list_in_db = record_in_db.deleted_friends
+        visit_history = record_in_db.visit_history
 
+        now_active_friends = new_data.ids
 
-class Friends(DB):
-    def __init__(self):
-        super().__init__()
+        restore_deleted_friends = self._calc_restore_friends(
+            deleted_friends_list_in_db,
+            now_active_friends
+        )
 
-    def _is_record_exist(self, vk_id):
-        if self._get_friends_by_id(vk_id) == None:
-            return False
-        return True
+        compare_deleted_friends = self._calc_deleted_friends(
+            last_active_friends_list,
+            new_data.ids
+        )
 
-    def _is_user_in_friends_list(self, source_id, target_id):
-        # source_id - юзер, в чьем списке друзей я проверяю наличие target_id
-        friends_list = self._get_friends_by_id(source_id)
-        if friends_list == None:
-            return None
-        if target_id in friends_list:
-            return True
-        return False
+        final_deleted_friends = restore_deleted_friends + compare_deleted_friends
 
-    def _exclude_in_db(self, friends_list):
-        friends_exclude_in_db = []
-        for friend_id in friends_list:
-            if not bool(self.find(self.friends_col, friend_id)):
-                friends_exclude_in_db.append(friend_id)
-        return friends_exclude_in_db
+        query = {"_id": vk_id}
+        self._generate_update_request(query, "active_friends", now_active_friends)
+        self._generate_update_request(query, "deleted_friends", final_deleted_friends)
+        self._record_new_visit(query, visit_history)
 
-    def _get_friends_by_id(self, whose_friends_vk_id, exclude_in_db=False) -> list | None:
-        # Возвращает список друзей, если есть запись о друзьях искомого юзера.
-        # Либо возвращает None, если такой записи нет
-        # Либо, если exclude_in_db=True, возвращает список друзей юзера, 
-        # записи о которых еще нет в бд (эта функция нужна для mutual_friends)
-        record = self.find(self.friends_col, whose_friends_vk_id)
-        if record == None:
-            return None
-        if exclude_in_db:
-            return self._exclude_in_db(record["friends"])
-        return record["friends"]
-    
-    def _new_record(self, whose_friends_vk_id, friends_list):
-        data = {"_id": whose_friends_vk_id, "friends": friends_list}
-        self.save(self.friends_col, data)
+    def _calc_restore_friends(self,
+        already_deleted: list[VK_ID],
+        active: list[VK_ID]
+    ) -> list[VK_ID]:
+        # Если кто-то был удален, но они снова начали дружить, то удаляем id из удаленных друзей
+        restore_list = []
 
-    def _update_existing_record(self, whose_friends_vk_id, friends_list):
-        db_friends = self._get_friends_by_id(whose_friends_vk_id)
-        if db_friends != None:
-            friends_in_db = set(self._get_friends_by_id(whose_friends_vk_id))
-            friends_list = set(friends_list)
-            new_friends = sorted(list(friends_list - friends_in_db))
-            if len(new_friends) != 0:
-                updated_values = {"$addToSet": {"friends": {"$each": new_friends}}}
-                self.update(self.friends_col, whose_friends_vk_id, updated_values)
+        for deleted_friend in already_deleted:
+            if deleted_friend not in active:
+                restore_list.append(deleted_friend)
 
-    def save_friends(self, vk_id, friends_list):
-        # Функция сохраняет список друзей friends_list пользователя vk_id
-        # vk_id - id пользователя вк, обладатель друзей
-        # friends_list - список друзей пользователя
+        return restore_list
 
-        if not self._is_user_in_db(self.friends_col, vk_id):
-            # условие выполняется, если до этого в бд не было сохранено списка
-            # друзей этом пользователя
-            self._new_record(vk_id, friends_list)
-        else:
-            # если список друзей до этого уже сохранялся, мы должны объединить
-            # список в бд и новый список
-            self._update_existing_record(vk_id, friends_list)
-        self._add_mutual_friends(vk_id, friends_list)
+    def _calc_deleted_friends(self,
+        old_list: list[VK_ID],
+        new_list: list[VK_ID]
+    ) -> list[VK_ID]:
+        # Добавляем новых удаленных людей
+        old_list_set = set(old_list)
+        new_list_set = set(new_list)
+        deleted_friends = old_list_set.difference(new_list)
+        return list(deleted_friends)
 
-    def _add_mutual_friends(self, whose_friends_vk_id, friends_list):
-        for friend_vk_id in friends_list:
-            # проходимся по всем друзьям циклом
-            if self._is_record_exist(friend_vk_id):
-                # проверяем есть ли запись в бд
-                if self._is_user_in_friends_list(friend_vk_id, whose_friends_vk_id):
-                    # может быть такое, что у friend_vk_id уже есть 
-                    # whose_friends_vk_id в списке друзей в бд, в этом случае 
-                    # не делаю ничего
-                    pass
-                else:
-                    # Если whose_friends_vk_id нет в списке друзей 
-                    # friend_vk_id, то добавляю его в список
-                    updated_values = {"$addToSet": {"friends": whose_friends_vk_id}}
-                    self.update(self.friends_col, friend_vk_id, updated_values)
-            else:
-                # если записи о пользователе нет, создаем новую запись
-                data = {"_id": friend_vk_id, "friends": [whose_friends_vk_id]}
-                self.save(self.friends_col, data)
+    def _generate_update_request(self, query, new_data_key, new_data_value):
+        self._update(query, {new_data_key: new_data_value})
+
+    def _record_new_visit(self, query, visit_history: list[datetime]):
+        # Зафиксировать новый визит
+        now = datetime.now()
+        visit_history.append(now)
+        self._generate_update_request(query, "visit_history", visit_history)
+
+    def _new_record(self, vk_id, data: FriendsResponse) -> None:
+        now = datetime.now()
+        inserted_record = FriendsRecord(
+            _id=vk_id,
+            visit_history=[now],
+            active_friends=data.items
+        )
+        self._insert(inserted_record)
+        logger.info(f"Friends list successfully saved: {vk_id}")
+
+    def get_by_vk_id(self, vk_id: VK_ID) -> FriendsRecord:
+        record_in_db = self._find({"_id": vk_id})
+        return FriendsRecord(**record_in_db)
+
+    def is_in_db(self, vk_id: VK_ID) -> bool:
+        record_in_db = self._find({"_id": vk_id})
+        return bool(record_in_db)
 
 
-class Graph(DB):
-    def __init__(self):
-        super().__init__()
+class UserCollection(MongoMethods, Collection):
+    def __init__(self, collection):
+        super().__init__(collection)
 
-    def get_all_users(self):
-        return self.users_col.find({})
+    def save(self, data: list[UserResponse]):
+        for user_response in data:
+            vk_id = user_response.id
 
-    def get_all_friends(self):
-        return self.friends_col.find({})
-    
-    def get_user_friends(self, vk_id):
-        return self.friends_col.find_one({"_id": vk_id})
+            is_in_db = self.is_in_db(vk_id)
+            if not(is_in_db):
+                self._new_record(user_response)
 
-    def get_part_of_friends(self):
-        friends = []
-        for user in self.get_all_friends():
-            if len(user["friends"]) >= 10:
-                friends.append(user)
-        return list(friends)
+    def _new_record(self, data: UserResponse):
 
-    def get(self, conds):
-        return self.friends_col.find(conds)
+        now = datetime.now()
 
-    def get_name_by_vk_id(self, vk_id):
-        record = self.users_col.find_one({"_id": vk_id})
-        name = ""
-        if record != None:
-            first_name = record["first_name"]
-            last_name = record["last_name"]
-            name = first_name + " " + last_name
-        else:
-            name = str(vk_id)
-        return name
-    
-    def get_count_of_mutual_relations(self, friends_list, vk_id):
-        """
-        Я сохраняю в бд записи с общими связями:
-        Если я затрагиваю пользователя A:
-        {A: [B, C, D]}
-        Но парсер не дотянулся до B, C, D из-за глубины сохранения,
-        то я в любом случае сохраняю обратные связи
-        {B: A}
-        {C: A}
-        {D: A}
+        clean_data = {
+            k: v for k, v in data if not(k in ["id", "_id"])
+        }
 
-        Данная функция берет список друзей vk_id и находит пересечение 
-        его списка друзей и friends_list и возвращает количество людей 
-        в пересечении
+        inserted_record = UserRecord(
+            _id=data.id,
+            visit_history=[now],
+            **clean_data
+        )
+        self._insert(inserted_record)
+        logger.info(f"new user info: {data.id}")
 
-        Используется для составления графа 2-го и выше колена, когда 
-        друзья source пользователя уже нанесены на граф
-        """
-        user_friends = set(self.get_user_friends(vk_id)["friends"])
-        friends_list = set(friends_list)
-        return len(user_friends & friends_list)
+    def get_by_vk_id(self, vk_id: VK_ID) -> UserRecord:
+        record_in_db = self._find({"_id": vk_id})
+        return UserRecord(**record_in_db)
 
+    def is_in_db(self, vk_id: VK_ID) -> bool:
+        record_in_db = self._find({"_id": vk_id})
+        return bool(record_in_db)
+
+
+class CollectionFactory:
+    _client = MongoClient(MONGO_URI)
+
+    def __init__(self, test=False, reset=False):
+        db_name = MONGO_DB_NAME
+        if test:
+            db_name = MONGO_TEST_DB_NAME
+
+        self._db = self._client[db_name]
+
+        if reset:
+            self.reset_collections()
+
+    def reset_collections(self):
+        collections_name = self._db.list_collection_names()
+
+        for collection_name in collections_name:
+            self._db[collection_name].drop()
+            self._db[collection_name]
+        print(self._db.list_collection_names())
+
+    def friend_collection(self, update=False, period=timedelta(days=14)):
+        collection = self._db[CollectionName.FRIENDS.value]
+        return FriendsCollection(collection, update, period)
+
+    def user_collection(self):
+        collection = self._db[CollectionName.USERS.value]
+        return UserCollection(collection)
