@@ -4,4 +4,24 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.9"
-dependencies = []
+dependencies = [
+    "logging>=0.4.9.6",
+    "networkx>=3.2.1",
+    "pydantic>=2.11.7",
+    "pymongo>=4.13.2",
+    "pytest>=8.4.1",
+    "requests>=2.32.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+]
+
+[tool.pylint.'MESSAGES CONTROL']
+disable = [
+    "missing-docstring",
+    "missing-function-docstring",
+    "missing-class-docstring",
+    "missing-module-docstring"
+]
