@@ -1,21 +1,18 @@
 import logging
 import time
 from collections import deque
-from functools import wraps
-import json
-from typing import Union, Optional, Callable
+from typing import Union, Optional
 from enum import Enum, IntEnum
 from dataclasses import dataclass
-from abc import ABC, abstractclassmethod
-
+from abc import ABC, abstractmethod
 import requests
-from requests.exceptions import ConnectionError, Timeout
+
 from config.config import API_KEY
-from models._types import FriendsModel, UserModel
-from .errors import VKApiErrorHandler, ErrorHandlerResult, ErrorAction
+from models._types import FriendsResponse, UserResponse
 
 
 logger = logging.getLogger(__name__)
+
 VK_API_VERSION = 5.199
 ERROR_RESPONSE = {"count": 0, "items": []}
 
@@ -85,11 +82,11 @@ class APIResponse:
     error: Optional[APIError]
 
 class ErrorClassifier(ABC):
-    @abstractclassmethod
+    @abstractmethod
     def classify_error(self, code: int, message: str) -> ErrorSeverity:
         pass
 
-    @abstractclassmethod
+    @abstractmethod
     def is_retryable(self, code: int) -> bool:
         pass
 
@@ -141,12 +138,12 @@ class VKAPIErrorClassifier(ErrorClassifier):
         if code in self.NON_CRITICAL or code in self.RETRYABLE:
             return ErrorSeverity.NON_CRITICAL
         elif code in self.CRITICAL:
-            logger.critical(f"critical error code: {code}, msg: {message}")
+            logger.critical("critical error code: %s, msg: %s", code, message)
             return ErrorSeverity.CRITICAL
         else:
-            logger.critical(f"unknown error code: {code}, msg: {message}")
+            logger.critical("unknown error code: %s, msg: %s", code, message)
             return ErrorSeverity.UNKNOWN
-    
+
     def is_retryable(self, code: int) -> bool:
         if code in self.RETRYABLE:
             return True
@@ -154,7 +151,7 @@ class VKAPIErrorClassifier(ErrorClassifier):
 
 
 class ResponseParser(ABC):
-    @abstractclassmethod
+    @abstractmethod
     def parse_response(self, response: requests.Response) -> APIResponse:
         pass
 
@@ -173,6 +170,7 @@ class JSONResponseParser(ResponseParser):
             severity = self.error_classifier.classify_error(code, message)
             is_retryable = self.error_classifier.is_retryable(code)
 
+            logger.info("response error: %s - %s", code, message)
             return APIResponse(
                 success=False,
                 data=None,
@@ -191,48 +189,50 @@ class JSONResponseParser(ResponseParser):
             )
 
 class RequestTracker(ABC):
-    @abstractclassmethod
+    @abstractmethod
     def acquire(self) -> None:
         pass
 
 class SynchronousRequestTracker(RequestTracker):
     """
     Апи имеют ограничения на количество запросов в секунду (Request Per Second).
-    Данный класс отслеживает RPS и ждет, исчерпан лимит запросов за последнюю 
+    Данный класс отслеживает RPS и ждет, исчерпан лимит запросов за последнюю
     секунду
     """
 
-    def __init__(self, exceptedRPS: int = 5):
+    def __init__(self, excepted_rps: int = 5):
         self.request_times = deque()
 
-        self.exceptedRPS = exceptedRPS
+        self.excepted_rps = excepted_rps
 
     def acquire(self) -> None:
         """
-        Проверяет время запросов в request_times и если количество запросов было 
-        равное значению exceptedRPS и все они были менее секунды назад, то 
-        функция останавливает всю программу на время, через которое можно будет 
-        снова отправить запрос 
+        Проверяет время запросов в request_times и если количество запросов было
+        равное значению excepted_rps и все они были менее секунды назад, то
+        функция останавливает всю программу на время, через которое можно будет
+        снова отправить запрос
         """
+        logger.debug("Access to acquire")
         while True:
             now = time.monotonic()
 
             while self.request_times and self.request_times[0] <= now - 1:
                 self.request_times.popleft()
 
-            if len(self.request_times) < self.exceptedRPS:
+            if len(self.request_times) < self.excepted_rps:
                 self.request_times.append(now)
+                logger.debug("Acquire release")
                 break
             else:
                 wait_time = self.request_times[0] + 1 - now
                 time.sleep(wait_time)
 
 class RetryStrategy(ABC):
-    @abstractclassmethod
-    def should_retry(self, attempt, response_error: APIError) -> bool:
+    @abstractmethod
+    def should_retry(self, attempt, response: APIResponse) -> bool:
         pass
 
-    @abstractclassmethod
+    @abstractmethod
     def get_delay(self, attempt) -> float:
         pass
 
@@ -240,12 +240,12 @@ class ExponentialBackoffRetryStrategy(RetryStrategy):
     def __init__(self, max_retries=3):
         self.base_delay = 1  # задержка в 1 секунду
         self.max_retries = max_retries
-    
-    def should_retry(self, attempt: int, response_error: APIError) -> bool:
+
+    def should_retry(self, attempt: int, response: APIResponse) -> bool:
         if attempt >= self.max_retries:
             return False
-        return response_error.is_retryable
-    
+        return response.error.is_retryable
+
     def get_delay(self, attempt: int) -> float:
         return self.base_delay * (2 ** attempt)
 
@@ -263,17 +263,17 @@ class APIClient():
         self.retry_strategy = retry_strategy
 
         self.request_exceptions = (
-            ConnectionError,
-            Timeout
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout
         )
-    
-    def make_request(self, 
+
+    def make_request(self,
         method: HTTPMethods,
         url: str,
         params: dict[str, Union[str, int, list[str]]]
     ) -> APIResponse:
         attempt = 0
-        
+
         while True:
             try:
                 self.request_tracker.acquire()
@@ -282,13 +282,14 @@ class APIClient():
 
                 parsed_response = self.response_parser.parse_response(response)
 
-                if not(parsed_response.error):
+                if not(parsed_response.error) or \
+                    parsed_response.error.severity is ErrorSeverity.NON_CRITICAL:
                     return parsed_response
-                
+
                 if self.retry_strategy.should_retry(attempt, parsed_response):
                     time.sleep(self.retry_strategy.get_delay(attempt))
                 else:
-                    logger.error(f"not retryable error: {url} {params}")
+                    logger.error("not retryable error: %s %s", url, params)
             except self.request_exceptions:
                 network_error = APIResponse(
                     success=False,
@@ -301,12 +302,12 @@ class APIClient():
                     )
                 )
 
-                if self.retry_strategy.should_retry(attempt, parsed_response):
+                if self.retry_strategy.should_retry(attempt, network_error):
                     time.sleep(self.retry_strategy.get_delay(attempt))
                 else:
-                    logger.error(f"not retryable error: {url} {params}")
+                    logger.error("not retryable error: %s %s", url, params)
                 attempt += 1
-            except Exception as e:
+            except Exception as e:  # pylint: disable=broad-exception-caught
                 logger.exception(e)
                 unknown_error = APIResponse(
                     success=False,
@@ -327,40 +328,40 @@ class APIClient():
     ) -> requests.Response:
         match method:
             case HTTPMethods.GET:
-                return requests.get(url, params=params)
+                return requests.get(url, params=params, timeout=1)
             case HTTPMethods.POST:
-                return requests.post(url, params=params)
+                return requests.post(url, params=params, timeout=1)
             case _:
-                ValueError(f"Неизвестный тип запроса: {method}")
+                raise ValueError(f"Неизвестный тип запроса: {method}")
 
 class APIResponseToPydanticConverter:
-    def friends(self, response: APIResponse) -> FriendsModel:
-        empty_model = FriendsModel(count=0, items=[])
-        
+    def friends(self, response: APIResponse) -> FriendsResponse:
+        empty_model = FriendsResponse(count=0, items=[])
+
         if response.data:
             response_data = response.data
             payload = response_data["response"]
 
             try:
-                return FriendsModel(**payload)
+                return FriendsResponse(**payload)
             except ValueError as e:
                 # Pydantic ValidationError наследуется от ValueError
-                logger.error(f"Pydantic Validation Error: {e}")
+                logger.exception("Pydantic Validation Error: %s", e)
                 return empty_model
         return empty_model
 
-    def users(self, response: APIResponse) -> list[UserModel]:
+    def users(self, response: APIResponse) -> list[UserResponse]:
         empty_response = []
-        
+
         if response.data:
             response_data = response.data
             payload = response_data["response"]
 
             try:
-                return [UserModel(**item) for item in payload]
+                return [UserResponse(**item) for item in payload]
             except ValueError as e:
                 # Pydantic ValidationError наследуется от ValueError
-                logger.error(f"Pydantic Validation Error: {e}")
+                logger.exception("Pydantic Validation Error: %s", e)
                 return empty_response
         return empty_response
 
@@ -380,9 +381,9 @@ class VKAPIClient(APIClient):
 
         self.base_url = "https://api.vk.com/method"
 
-    def request(self, 
-        method, 
-        resource: VKAPIResource, 
+    def request(self,
+        method,
+        resource: VKAPIResource,
         params: dict[str, Union[str, int, list[str]]]
     ) -> APIResponse:
         params.update(
@@ -405,7 +406,7 @@ class VKAPIInterface:
         self.client = client
         self.converter = APIResponseToPydanticConverter()
 
-    def get_friends(self, vk_id: int) -> FriendsModel:
+    def get_friends(self, vk_id: int) -> FriendsResponse:
         params = {
             "user_id": vk_id,
             "order": "hints",
@@ -420,9 +421,11 @@ class VKAPIInterface:
 
         pydantic_model = self.converter.friends(response)
 
+        logger.info("id: %s; count friends: %s", vk_id, len(pydantic_model.items))
+
         return pydantic_model
 
-    def get_users(self, vk_ids: int | list[int]) -> list[UserModel]:
+    def get_users(self, vk_ids: int | list[int]) -> list[UserResponse]:
         if isinstance(vk_ids, int):
             vk_ids = [vk_ids]
         params={
@@ -452,6 +455,8 @@ class VKAPIInterface:
             params
         )
 
+        logger.info(vk_ids)
+
         pydantic_model = self.converter.users(response)
 
         return pydantic_model
@@ -460,7 +465,7 @@ class VKAPICodeInterface:
     def __init__(self, client: VKAPIClient):
         self.client = client
         self.converter = APIResponseToPydanticConverter()
-    
+
     def _execute(self, code):
         params = {
             "code": code
@@ -474,17 +479,18 @@ class VKAPICodeInterface:
 
     def get_friends(self, vk_ids: list[int]):
         code = f"""
-        var my_users = {vk_ids};
-        var return_data = [];
-        var a = 0;
-        while (a != my_users.length) {{
-            var friends = API.friends.get({{ "user_id":my_users[a] }});
-            var owner_friends_dict = {{"owner": my_users[a], "friends": friends.items}};
-            return_data.push(owner_friends_dict);
+        var user_ids = {vk_ids}; // до 25 пользователей
+        var result = [];
+        var i = 0;
 
-            a = a + 1;
-        }}; 
-        return return_data;
+        while (i < user_ids.length) {{
+            var uid = user_ids[i];
+            var friends = API.friends.get({{ user_id: uid, order: "hints", count: 1000 }}).items;
+            result.push({{ "id": uid, "friends": friends }});
+            i = i + 1;
+        }}
+
+        return result;
         """
 
         return self._execute(code)
